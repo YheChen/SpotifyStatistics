@@ -1,10 +1,19 @@
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+import { NextResponse } from "next/server";
 
 export async function GET() {
   const cookieStore = cookies();
-  cookieStore.delete("spotify_access_token");
-  cookieStore.delete("spotify_refresh_token");
 
-  return redirect("/");
+  // Clear tokens
+  cookieStore.set("spotify_access_token", "", {
+    path: "/",
+    maxAge: 0,
+  });
+
+  cookieStore.set("spotify_refresh_token", "", {
+    path: "/",
+    maxAge: 0,
+  });
+
+  return NextResponse.json({ success: true });
 }

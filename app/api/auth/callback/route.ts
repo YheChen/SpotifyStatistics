@@ -1,22 +1,22 @@
-import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/spotify";
+import { NextRequest, NextResponse } from "next/server";
+import { redirect } from "next/navigation";
 
-export async function GET(req: NextRequest) {
-  const url = new URL(req.url);
+export async function GET(request: NextRequest) {
+  const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const error = url.searchParams.get("error");
 
   if (error || !code) {
-    return NextResponse.redirect(new URL("/?error=auth_failed", req.url));
+    return redirect("/?error=auth_failed");
   }
 
   try {
     const tokens = await getAccessToken(code);
 
-    const res = NextResponse.redirect(new URL("/dashboard", req.url));
+    const response = NextResponse.redirect(new URL("/dashboard", request.url));
 
-    // ✅ Set access token cookie (1 hour)
-    res.cookies.set("spotify_access_token", tokens.access_token, {
+    response.cookies.set("spotify_access_token", tokens.access_token, {
       path: "/",
       maxAge: tokens.expires_in,
       httpOnly: true,
@@ -24,9 +24,8 @@ export async function GET(req: NextRequest) {
       sameSite: "lax",
     });
 
-    // ✅ Set refresh token cookie (30 days)
     if (tokens.refresh_token) {
-      res.cookies.set("spotify_refresh_token", tokens.refresh_token, {
+      response.cookies.set("spotify_refresh_token", tokens.refresh_token, {
         path: "/",
         maxAge: 30 * 24 * 60 * 60,
         httpOnly: true,
@@ -35,9 +34,9 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    return res;
+    return response;
   } catch (e) {
-    console.error("Auth error:", e);
-    return NextResponse.redirect(new URL("/?error=auth_failed", req.url));
+    console.error("Error during callback:", e);
+    return redirect("/?error=auth_failed");
   }
 }
