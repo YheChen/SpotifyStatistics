@@ -1,11 +1,9 @@
-import { cookies } from "next/headers";
 import type {
   Track,
   Artist,
   SpotifyTopItemsResponse,
   SpotifyTokenResponse,
 } from "./types";
-what;
 const CLIENT_ID = process.env.SPOTIFY_CLIENT_ID!;
 const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET!;
 const REDIRECT_URI =
@@ -89,40 +87,47 @@ export async function refreshAccessToken(
   return await res.json();
 }
 
-/**
- * Fetch top items (tracks or artists)
- */
-export async function getTopItems(
+export async function getTopItemsRaw(
+  accessToken: string,
   type: "tracks" | "artists",
   options: { limit: number; time_range: string }
 ): Promise<Track[] | Artist[]> {
-  const cookieStore = cookies();
-  let accessToken = cookieStore.get("spotify_access_token")?.value;
-  const refreshToken = cookieStore.get("spotify_refresh_token")?.value;
-
-  if (!accessToken) {
-    throw new Error("No access token found");
-  }
-
   const url = `https://api.spotify.com/v1/me/top/${type}?${new URLSearchParams({
     limit: options.limit.toString(),
     time_range: options.time_range,
   }).toString()}`;
 
-  let res = await fetch(url, {
+  const res = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 
-  // If unauthorized, try refreshing token
-  if (res.status === 401 && refreshToken) {
-    try {
-      const newToken = await refreshAccessToken(refreshToken);
+  if (!res.ok) {
+    throw new Error(`Spotify API error: ${res.statusText}`);
+  }
 
-      // Cannot set cookies here directly — must re-authenticate or re-issue cookies via server route
-      throw new Error("Token expired, please log in again.");
-    } catch (e) {
-      throw new Error("Refresh failed, please log in again.");
-    }
+  const data = await res.json();
+  return data.items;
+}
+
+/**
+ * Fetch top items (tracks or artists)
+ */
+export async function getTopItems(
+  type: "tracks" | "artists",
+  options: { limit: number; time_range: string },
+  accessToken: string
+): Promise<Track[] | Artist[]> {
+  const url = `https://api.spotify.com/v1/me/top/${type}?${new URLSearchParams({
+    limit: options.limit.toString(),
+    time_range: options.time_range,
+  }).toString()}`;
+
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (res.status === 401) {
+    throw new Error("Unauthorized");
   }
 
   if (!res.ok) {

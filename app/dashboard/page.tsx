@@ -33,17 +33,35 @@ export default function Dashboard() {
         const trackRes = await fetch(
           `/api/spotify/top?type=tracks&limit=${limit}&time_range=${timeRange}`
         );
+        if (
+          !trackRes.ok ||
+          !trackRes.headers.get("content-type")?.includes("application/json")
+        ) {
+          throw new Error("Invalid track response");
+        }
         const tracksData = await trackRes.json();
+        if (!Array.isArray(tracksData)) {
+          throw new Error("Expected tracksData to be an array");
+        }
         setTopTracks(tracksData);
 
         const artistRes = await fetch(
           `/api/spotify/top?type=artists&limit=${limit}&time_range=${timeRange}`
         );
+        if (
+          !artistRes.ok ||
+          !artistRes.headers.get("content-type")?.includes("application/json")
+        ) {
+          throw new Error("Invalid artist response");
+        }
         const artistsData = await artistRes.json();
+        if (!Array.isArray(artistsData)) {
+          throw new Error("Expected artistsData to be an array");
+        }
         setTopArtists(artistsData);
       } catch (error) {
         console.error("Error fetching data:", error);
-        router.push("/");
+        router.push("/?error=invalid_response");
       } finally {
         setLoading(false);
       }
