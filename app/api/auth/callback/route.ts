@@ -1,46 +1,43 @@
-import { cookies } from "next/headers"
-import { redirect } from "next/navigation"
-import { getAccessToken } from "@/lib/spotify"
+import { NextRequest, NextResponse } from "next/server";
+import { getAccessToken } from "@/lib/spotify";
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
-  const code = searchParams.get("code")
-  const error = searchParams.get("error")
+export async function GET(req: NextRequest) {
+  const url = new URL(req.url);
+  const code = url.searchParams.get("code");
+  const error = url.searchParams.get("error");
 
   if (error || !code) {
-    return redirect("/?error=auth_failed")
+    return NextResponse.redirect(new URL("/?error=auth_failed", req.url));
   }
 
   try {
-    const tokenResponse = await getAccessToken(code)
+    const tokens = await getAccessToken(code);
 
-    // Set cookies with the tokens
-    const cookieStore = cookies()
+    const res = NextResponse.redirect(new URL("/dashboard", req.url));
 
-    // Set access token cookie (expires in 1 hour)
-    cookieStore.set("spotify_access_token", tokenResponse.access_token, {
-      maxAge: tokenResponse.expires_in,
+    // ✅ Set access token cookie (1 hour)
+    res.cookies.set("spotify_access_token", tokens.access_token, {
       path: "/",
+      maxAge: tokens.expires_in,
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-    })
+    });
 
-    // Set refresh token cookie (if available)
-    if (tokenResponse.refresh_token) {
-      cookieStore.set("spotify_refresh_token", tokenResponse.refresh_token, {
-        maxAge: 30 * 24 * 60 * 60, // 30 days
+    // ✅ Set refresh token cookie (30 days)
+    if (tokens.refresh_token) {
+      res.cookies.set("spotify_refresh_token", tokens.refresh_token, {
         path: "/",
+        maxAge: 30 * 24 * 60 * 60,
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
-      })
+      });
     }
 
-    // Redirect to dashboard
-    return redirect("/dashboard")
-  } catch (error) {
-    console.error("Error during authentication:", error)
-    return redirect("/?error=auth_failed")
+    return res;
+  } catch (e) {
+    console.error("Auth error:", e);
+    return NextResponse.redirect(new URL("/?error=auth_failed", req.url));
   }
 }
